@@ -1,0 +1,121 @@
+#include "TextLCD.h"
+#include "mbed.h"
+#include "Rtc_Ds1307.h"
+//random line
+/* Specifying States and variables */
+
+Serial pc(USBTX, USBRX);
+AnalogIn light_pin(PTB0);  
+DigitalOut buzzer_enable(PTD7);
+Rtc_Ds1307 rtc(PTE0, PTE1);
+/*TextLCD lcd(p15, p16, p17, p18, p19, p20); */ 
+//TextLCD lcd(PTC1, PTC2, PTB3, PTB2, PTB1, PTB0); 
+
+//Declare functions//
+int light_state();  //Compare brightness with nominal brightness of lit room
+int buzzer_state(int alarmseconds,int seconds); //Compare time with alarm time
+
+ 
+/* Setting time structure */
+Rtc_Ds1307::Time_rtc tm1 = {}; //current time data structure
+Rtc_Ds1307::Time_rtc atm = {}; //alarm time data structure
+
+
+/* 
+Main function, which includes:
+i. LCD Display updating with time increment
+ii. Controls Buzzer State
+iii. Detects Light Sensor State
+iv. Changes alarm time
+*/
+ 
+int main() {
+    
+    pc.printf("Enter the date (date 0..31)");   //Request day from user
+    pc.scanf("%d", &tm1.date);                  //User enters date    
+    pc.printf("Enter the date (month 1..12)");  //Request month from user
+    pc.scanf("%d", &tm1.mon);                   //User enters month
+    pc.printf("Enter the date (year)");         //Request year from user
+    pc.scanf("%d", &tm1.year);                  //User enters year
+    pc.printf("Enter the current time (hours 0..23)");  //Request hour
+    pc.scanf("%d", &tm1.hour);                          //User enters hour
+    pc.printf("Enter the current time (minutes 0..59)");//Request minutes
+    pc.scanf("%d", &tm1.min);                           //User enters minutes
+    pc.printf("Enter the current time (seconds 0..59)");//Request seconds
+    pc.scanf("%d", &tm1.sec);                           //User enters seconds
+    
+    pc.printf("Set the alarm time (hours 0..23)");   //Request alarm hour
+    pc.scanf("%d", &atm.hour);                       //User enters alarm hour
+    pc.printf("Set the alarm time (minutes 0..59)"); //Request alarm minutes
+    pc.scanf("%d", &atm.min);                        //User enters alarm minutes
+    pc.printf("Set the alarm time (seconds 0..59)"); //Request alarm seconds
+    pc.scanf("%d", &atm.sec);                        //User enters alarm seconds
+    
+    pc.printf("Performing write operation\n\r");     //Writing time to memory
+    
+    rtc.setTime(tm1,true, false);
+    
+    rtc.getTime(tm1);
+    
+    //Local Variables
+    int buzzer = 0;
+    int light = 0;
+      
+    //Time counter
+    for ( ; ; )
+    {
+        //Determine alarm state
+        buzzer = buzzer_state(atm,tm1);     //obtain buzzer state from function
+        light = light_state();              //Obtain light state from function
+        
+        if (buzzer == 1 && light == 1) {    //If dark and alarm time == time
+            buzzer_enable = 1;              //buzzer on
+            }
+    }
+}
+
+
+/* Function for light sensor*/
+
+//Function returns 0 when the light is on and 1 when the light is off//
+//An LDR is used to measure the brightness of the alarm clock's surroundings
+//In dimly lit conditions, brightness>0.8. In a bright room, brightness~0.6
+
+int light_state() {
+    
+    //Declare local variables//
+    int state = 0;
+    
+    float brightness = light_pin;   //Create brightness
+if (brightness < 0.8){              //Compare brightness level with
+        state = 0;                  //nominal lit room conditions
+        }                           //Return 0 if light is on 
+    else{
+        state = 1;                  //Return 1 if light is off
+    }
+    return state;
+}
+     
+/* END */
+
+
+
+/* Function for buzzer ON/OFF */
+
+//Function returns 1 when time==alarm time and 0 when time!=alarm time//
+
+int buzzer_state(Rtc_Ds1307::Time_rtc &arg1,Rtc_Ds1307::Time_rtc &arg2) {
+    
+    //Declare local variables//
+    int state = 0;
+        
+    if( arg1.sec == arg2.sec && arg1.min == arg2.min && arg1.hour == arg2.hour ) {
+        state = 1;           //buzzer is switched on when time == alarm time
+        }
+    else{
+        state = 0;            //otherwise the alarm is switched off
+        }
+    return state;
+}
+
+/*END*/
